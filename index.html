@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>3D Model Viewer with Babylon.js</title>
+    <style>
+        body, html { width: 100%; height: 100%; padding: 0; margin: 0; overflow: hidden; }
+        #renderCanvas { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    <div id="priceTracker" style="position: fixed; top: 20px; right: 20px; color: white; background-color: rgba(0, 0, 0, 0.5); padding: 10px; font-size: 36px; border-radius: 5px;">
+        Цена GRAM: $0.00
+    </div>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script> <!-- Добавлен для использования GUI -->
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+        var engine = new BABYLON.Engine(canvas, true);
+
+        var createScene = function() {
+            var scene = new BABYLON.Scene(engine);
+            var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+
+            var followCamera = new BABYLON.FollowCamera("FollowCam", new BABYLON.Vector3(0, 10, -10), scene);
+            followCamera.radius = 20;
+            followCamera.heightOffset = 10;
+            followCamera.rotationOffset = 0;
+            followCamera.cameraAcceleration = 0.05;
+            followCamera.maxCameraSpeed = 50;
+            scene.activeCamera = followCamera;
+
+            var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+            // Функция для создания планет
+            function createPlanet(size, position, textureUrl, bumpUrl) {
+                var planet = BABYLON.MeshBuilder.CreateSphere("planet", {diameter: size}, scene);
+                planet.position = position;
+                var planetMaterial = new BABYLON.StandardMaterial("planetMaterial", scene);
+                planetMaterial.diffuseTexture = new BABYLON.Texture(textureUrl, scene);
+                if (bumpUrl) {
+                    planetMaterial.bumpTexture = new BABYLON.Texture(bumpUrl, scene);
+                }
+                planet.material = planetMaterial;
+                return planet;
+            }
+
+            var moon = createPlanet(10, new BABYLON.Vector3(5, 10, -10), "textures/moon.jpg", "textures/moon_normalmap.jpg");
+            var planet1 = createPlanet(8, new BABYLON.Vector3(30, 10, -10), "textures/planet1.jpg", null);
+            var planet2 = createPlanet(12, new BABYLON.Vector3(55, 10, -10), "textures/planet2.jpg", null);
+            var planet3 = createPlanet(10, new BABYLON.Vector3(80, 10, -10), "textures/planet3.jpg", null);
+
+            // Функция для добавления 3D текста над планетами
+            function add3DText(text, mesh) {
+                var label = new BABYLON.GUI.Rectangle("label for " + mesh.name);
+                label.background = "black";
+                label.height = "30px";
+                label.alpha = 0.5;
+                label.width = "100px";
+                label.cornerRadius = 20;
+                label.thickness = 1;
+                label.linkOffsetY = 30;
+                advancedTexture.addControl(label);
+                label.linkWithMesh(mesh);
+
+                var textBlock = new BABYLON.GUI.TextBlock();
+                textBlock.text = text;
+                textBlock.color = "white";
+                label.addControl(textBlock);
+            }
+
+            // Добавляем надписи
+            add3DText("0.005$", moon);
+            add3DText("0.01$", planet1);
+            add3DText("0.02$", planet2);
+            add3DText("0.03$", planet3);
+
+            // Звездное небо
+            var starParticleSystem = new BABYLON.ParticleSystem("stars", 10000, scene);
+            starParticleSystem.particleTexture = new BABYLON.Texture("textures/star.png", scene);
+            starParticleSystem.emitter = new BABYLON.Vector3(0, 0, 0);
+            starParticleSystem.minEmitBox = new BABYLON.Vector3(-250, -250, -250);
+            starParticleSystem.maxEmitBox = new BABYLON.Vector3(250, 250, 250);
+            starParticleSystem.color1 = new BABYLON.Color4(1, 1, 1, 1);
+            starParticleSystem.color2 = new BABYLON.Color4(0.5, 0.5, 0.5, 1);
+            starParticleSystem.minSize = 0.5;
+            starParticleSystem.maxSize = 1.0;
+            starParticleSystem.minLifeTime = Infinity;
+            starParticleSystem.maxLifeTime = Infinity;
+            starParticleSystem.emitRate = 10000;
+            starParticleSystem.gravity = new BABYLON.Vector3(0, 0, 0);
+            starParticleSystem.direction1 = new BABYLON.Vector3(0, 1, 0);
+            starParticleSystem.direction2 = new BABYLON.Vector3(0, -1, 0);
+            starParticleSystem.minEmitPower = 0;
+            starParticleSystem.maxEmitPower = 0;
+            starParticleSystem.updateSpeed = 0.005;
+            starParticleSystem.start();
+
+
+            BABYLON.SceneLoader.ImportMesh("", "", "scene.glb", scene, function (newMeshes, particleSystems, skeletons) {
+            var rocket = newMeshes[0];
+            rocket.position = new BABYLON.Vector3(0, 0, 0);
+            rocket.scaling = new BABYLON.Vector3(1.5, 1.5, 1.5); // Увеличиваем размер модели
+
+            followCamera.lockedTarget = rocket;
+
+
+
+                var fireSystem = new BABYLON.ParticleSystem("fire", 2000, scene);
+                fireSystem.particleTexture = new BABYLON.Texture("textures/flame.png", scene);
+                fireSystem.emitter = rocket; // Назначаем ракету эмиттером огня
+                fireSystem.minEmitBox = new BABYLON.Vector3(-0.5, -0.7, -0.5); // Настройка позиции огня
+                fireSystem.maxEmitBox = new BABYLON.Vector3(0.5, -1.5, 0.5);
+                fireSystem.color1 = new BABYLON.Color4(1, 0.6, 0, 1);
+                fireSystem.color2 = new BABYLON.Color4(1, 0.5, 0, 1);
+                fireSystem.minSize = 0.3;
+                fireSystem.maxSize = 1.5;
+                fireSystem.minLifeTime = 0.2;
+                fireSystem.maxLifeTime = 0.4;
+                fireSystem.emitRate = 500;
+                fireSystem.gravity = new BABYLON.Vector3(0, -10, 0);
+                fireSystem.direction1 = new BABYLON.Vector3(-2, -8, -2);
+                fireSystem.direction2 = new BABYLON.Vector3(2, -8, 2);
+                fireSystem.minEmitPower = 1;
+                fireSystem.maxEmitPower = 3;
+                fireSystem.updateSpeed = 0.01;
+                fireSystem.start();
+
+                
+                // Управление ракетой и камерой
+                var speed = 0;
+                var maxSpeed = 10;
+                var acceleration = 0.1;
+
+                scene.onBeforeRenderObservable.add(() => {
+                    var forward = followCamera.getFrontPosition(1).subtract(followCamera.position).normalize();
+                    rocket.position.addInPlace(forward.scale(speed));
+                });
+
+                window.addEventListener("keydown", function(evt) {
+                    switch (evt.key) {
+                        case "ArrowUp":
+                            speed = Math.min(speed + acceleration, maxSpeed);
+                            break;
+                        case "ArrowDown":
+                            speed = Math.max(speed - acceleration, -maxSpeed);
+                            break;
+                        case "w":
+                            followCamera.heightOffset += 1;
+                            break;
+                        case "s":
+                            followCamera.heightOffset -= 1;
+                            break;
+                        case "a":
+                            followCamera.rotationOffset -= 1;
+                            break;
+                        case "d":
+                            followCamera.rotationOffset += 1;
+                            break;
+                    }
+                });
+            });
+
+
+            return scene;
+        };
+
+        var scene = createScene();
+
+        engine.runRenderLoop(function () {
+            scene.render();
+        });
+
+        window.addEventListener("resize", function () {
+            engine.resize();
+        });
+
+       function fetchTokenPrice() {
+            fetch('https://api.geckoterminal.com/api/v2/simple/networks/ton/token_price/EQC47093oX5Xhb0xuk2lCr2RhS8rj-vul61u4W2UH5ORmG_O', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;version=20230302',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                const price = data.data.attributes.token_prices["EQC47093oX5Xhb0xuk2lCr2RhS8rj-vul61u4W2UH5ORmG_O"];
+                document.getElementById('priceTracker').innerText = `Цена GRAM: $${parseFloat(price).toFixed(4)}`;
+            })
+            .catch(error => console.error('Ошибка при получении цены токена:', error));
+        }
+        // Вызов функции при загрузке страницы и её периодическое обновление
+        document.addEventListener('DOMContentLoaded', fetchTokenPrice);
+        setInterval(fetchTokenPrice, 60000);
+    </script>
+
+</body>
+</html>
+
+
+
+
+
+
+
