@@ -13,6 +13,13 @@
     <div id="priceTracker" style="position: fixed; top: 20px; right: 20px; color: white; background-color: rgba(0, 0, 0, 0.5); padding: 10px; font-size: 36px; border-radius: 5px;">
         Цена GRAM: $0.00
     </div>
+    <div id="controls" style="position: fixed; bottom: 50px; width: 100%; text-align: center;">
+    <button id="up" style="font-size: 24px; margin: 0 10px;">⬆️</button>
+    <button id="down" style="font-size: 24px; margin: 0 10px;">⬇️</button>
+        <button id="requestPermission" style="font-size: 36px; margin: 0 10px;">Разрешить доступ к гироскопу</button>
+
+    </div>
+
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script> <!-- Добавлен для использования GUI -->
@@ -31,6 +38,8 @@
             followCamera.cameraAcceleration = 0.05;
             followCamera.maxCameraSpeed = 50;
             scene.activeCamera = followCamera;
+
+
 
             var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
 
@@ -52,6 +61,11 @@
             var planet2 = createPlanet(12, new BABYLON.Vector3(55, 10, -10), "textures/planet2.jpg", null);
             var planet3 = createPlanet(10, new BABYLON.Vector3(80, 10, -10), "textures/planet3.jpg", null);
 
+            // Добавляем свечение Луне
+            var glowLayer = new BABYLON.GlowLayer("glow", scene);
+            glowLayer.intensity = 0.9;
+            glowLayer.addIncludedOnlyMesh(moon);
+
             // Функция для добавления 3D текста над планетами
             function add3DText(text, mesh) {
                 var label = new BABYLON.GUI.Rectangle("label for " + mesh.name);
@@ -72,10 +86,10 @@
             }
 
             // Добавляем надписи
-            add3DText("0.005$", moon);
-            add3DText("0.01$", planet1);
-            add3DText("0.02$", planet2);
-            add3DText("0.03$", planet3);
+            add3DText("0.05$", moon);
+            add3DText("0.1$", planet1);
+            add3DText("0.2$", planet2);
+            add3DText("0.3$", planet3);
 
             // Звездное небо
             var starParticleSystem = new BABYLON.ParticleSystem("stars", 10000, scene);
@@ -128,11 +142,47 @@
                 fireSystem.updateSpeed = 0.01;
                 fireSystem.start();
 
-                
+                // Функция обновления позиции ракеты на основе текущего курса GRAM
+            function updateRocketPosition(currentPrice) {
+                // Определите координаты планет
+                var moonPosition = new BABYLON.Vector3(5, 10, -10);
+                var planet1Position = new BABYLON.Vector3(30, 10, -10);
+                var planet2Position = new BABYLON.Vector3(55, 10, -10);
+                var planet3Position = new BABYLON.Vector3(80, 10, -10);
+
+                // Шкала цен от 0.005 до 0.3
+                var minPrice = 0.05;
+                var maxPrice = 0.3;
+
+                // Нормализовать текущую цену в диапазоне от 0 до 1
+                var normalizedPrice = (currentPrice - minPrice) / (maxPrice - minPrice);
+
+                // Интерполировать позицию ракеты между планетами
+                var interpolatedPosition;
+                if (currentPrice <= 0.1) {
+                    interpolatedPosition = BABYLON.Vector3.Lerp(moonPosition, planet1Position, normalizedPrice * 4); // Умножаем, потому что шаг увеличен
+                } else if (currentPrice <= 0.2) {
+                    interpolatedPosition = BABYLON.Vector3.Lerp(planet1Position, planet2Position, (normalizedPrice - 0.25) * 4); // Сдвигаем и умножаем диапазон
+                } else {
+                    interpolatedPosition = BABYLON.Vector3.Lerp(planet2Position, planet3Position, (normalizedPrice - 0.5) * 4);
+                }
+
+                // Создаем ракету в интерполированной позиции
+                if (window.rocket) {
+                    window.rocket.position = interpolatedPosition;
+                } else {
+                    BABYLON.SceneLoader.ImportMesh("", "", "scene.blg", scene, function (newMeshes) {
+                        window.rocket = newMeshes[0];
+                        window.rocket.position = interpolatedPosition;
+                        window.rocket.scaling = new BABYLON.Vector3(1.5, 1.5, 1.5);
+                    });
+                }
+            }
                 // Управление ракетой и камерой
-                var speed = 0;
-                var maxSpeed = 10;
-                var acceleration = 0.1;
+                window.speed = 0; // Замените локальную переменную speed на глобальную
+window.acceleration = 0.1;
+window.maxSpeed = 10;
+
 
                 scene.onBeforeRenderObservable.add(() => {
                     var forward = followCamera.getFrontPosition(1).subtract(followCamera.position).normalize();
@@ -148,21 +198,20 @@
                             speed = Math.max(speed - acceleration, -maxSpeed);
                             break;
                         case "w":
-                            followCamera.heightOffset += 1;
+                            followCamera.heightOffset -= 1.5;
                             break;
                         case "s":
-                            followCamera.heightOffset -= 1;
+                            followCamera.heightOffset += 1.5;
                             break;
                         case "a":
-                            followCamera.rotationOffset -= 1;
+                            followCamera.rotationOffset -= 2.5;
                             break;
                         case "d":
-                            followCamera.rotationOffset += 1;
+                            followCamera.rotationOffset += 2.5;
                             break;
                     }
                 });
             });
-
 
             return scene;
         };
@@ -194,6 +243,61 @@
         // Вызов функции при загрузке страницы и её периодическое обновление
         document.addEventListener('DOMContentLoaded', fetchTokenPrice);
         setInterval(fetchTokenPrice, 60000);
+
+document.addEventListener('DOMContentLoaded', function() {
+    var upButton = document.getElementById('up');
+    var downButton = document.getElementById('down');
+
+    upButton.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        window.speed = Math.min(window.speed + window.acceleration, window.maxSpeed);
+    }, false);
+
+    downButton.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        window.speed = Math.max(window.speed - window.acceleration, -window.maxSpeed);
+    }, false);
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const requestPermissionButton = document.getElementById('requestPermission');
+    if (requestPermissionButton) {
+        requestPermissionButton.addEventListener('click', function() {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                // Запрос разрешения для iOS 13+
+                DeviceMotionEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            // Разрешение получено
+                            window.addEventListener('deviceorientation', handleOrientation, true);
+                        } else {
+                            alert('Доступ к гироскопу не разрешён');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Для Android и браузеров, не требующих явного разрешения
+                window.addEventListener('deviceorientation', handleOrientation, true);
+            }
+        });
+    }
+});
+
+
+function handleOrientation(event) {
+    // Получаем данные ориентации устройства
+    const gamma = event.gamma; // Наклон влево/вправо: в диапазоне от -90 до +90
+    const beta = event.beta;  // Перед/назад: в диапазоне от -180 до +180
+
+    // Преобразуем данные гироскопа в углы вращения камеры
+    // Предполагается, что followCamera является вашей камерой в Babylon.js
+    if (followCamera) {
+        // Применяем значения gamma и beta как углы вращения камеры
+        // Коэффициенты масштабирования (0.1 в данном случае) помогают сгладить и замедлить вращение
+        followCamera.rotation.y += gamma * 0.1 * (Math.PI / 180); // Преобразуем градусы в радианы
+        followCamera.rotation.x += beta * 0.1 * (Math.PI / 180); // Преобразуем градусы в радианы
+    }
+}
     </script>
 
 </body>
